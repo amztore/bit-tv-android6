@@ -1,0 +1,82 @@
+name: Patch Bit TV Android 6
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Download Bit TV APK
+        run: |
+          curl -L --fail \
+            -o BitTV.apk \
+            https://github.com/amztore/bit-tv-android6/releases/download/v1/BitTV.apk
+
+      - name: Download Apktool
+        run: |
+          curl -L --fail \
+            -o apktool.jar \
+            https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar
+
+      - name: Decode APK
+        run: |
+          java -Xmx3g -jar apktool.jar d -f BitTV.apk -o work
+
+      - name: Change minimum Android version to 23
+        run: |
+          python3 - <<'PY'
+          import re
+
+          p = "work/AndroidManifest.xml"
+
+          with open(p, "r", encoding="utf-8") as f:
+              s = f.read()
+
+          s = re.sub(
+              r'android:minSdkVersion="(\d+)"',
+              lambda m: 'android:minSdkVersion="23"'
+              if int(m.group(1)) > 23
+              else m.group(0),
+              s
+          )
+
+          with open(p, "w", encoding="utf-8") as f:
+              f.write(s)
+
+          print("minSdk patched to API 23")
+          PY
+
+      - name: Rebuild APK
+        run: |
+          java -Xmx3g -jar apktool.jar b work -o unsigned.apk
+
+      - name: Sign APK
+        run: |
+          curl -L --fail \
+            -o uber-apk-signer.jar \
+            https://github.com/patrickfav/uber-apk-signer/releases/download/v1.3.0/uber-apk-signer-1.3.0.jar
+
+          mkdir -p signed
+
+          java -jar uber-apk-signer.jar \
+            --apks unsigned.apk \
+            --out signed \
+            --overwrite
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BitTV-Android6
+          path: signed/*signed.apk
+          if-no-files-found: error

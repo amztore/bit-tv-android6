@@ -17,16 +17,51 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Download Bit TV APK
+      - name: Find and Download Bit TV APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download v1 \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "BitTV.apk" \
-            --output BitTV.apk
+          gh api "repos/$GITHUB_REPOSITORY/releases" \
+            --paginate \
+            > releases.json
 
-          echo "APK berhasil diambil:"
+          python3 - <<'PY'
+          import json
+          import sys
+
+          with open("releases.json", "r", encoding="utf-8") as f:
+              releases = json.load(f)
+
+          found = None
+
+          for release in releases:
+              for asset in release.get("assets", []):
+                  if asset.get("name") == "BitTV.apk":
+                      found = asset.get("url")
+                      print("Found BitTV.apk")
+                      print("Release:", release.get("name"))
+                      print("Tag:", release.get("tag_name"))
+                      break
+              if found:
+                  break
+
+          if not found:
+              print("ERROR: BitTV.apk tidak ditemukan di Release mana pun.")
+              sys.exit(1)
+
+          with open("asset_url.txt", "w", encoding="utf-8") as f:
+              f.write(found)
+          PY
+
+          ASSET_URL=$(cat asset_url.txt)
+
+          curl -L --fail \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "$ASSET_URL" \
+            -o BitTV.apk
+
+          echo "APK berhasil didownload:"
           ls -lh BitTV.apk
 
       - name: Download Apktool

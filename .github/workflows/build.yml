@@ -125,9 +125,25 @@ jobs:
 
           ls -lh signed
 
+            - name: Prepare APK
+        run: |
+          APK=$(find signed -type f -name "*.apk" | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK hasil signing tidak ditemukan."
+            find signed -maxdepth 2 -type f -print
+            exit 1
+          fi
+
+          echo "APK hasil signing:"
+          echo "$APK"
+
+          cp "$APK" BitTV-Android6.apk
+          ls -lh BitTV-Android6.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: BitTV-Android6
-          path: signed/*signed.apk
+          path: BitTV-Android6.apk
           if-no-files-found: error
